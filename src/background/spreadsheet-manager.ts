@@ -43,7 +43,7 @@ export async function initSpreadsheet(): Promise<string> {
   const sheetName = await getSheetName();
 
   // Search for existing
-  const existing = await searchDriveFile("Soko");
+  const existing = await searchDriveFile("Knots Sheets");
   if (existing) {
     await browser.storage.local.set({ spreadsheetId: existing.id });
     await ensureSheet(existing.id, sheetName);
@@ -51,7 +51,7 @@ export async function initSpreadsheet(): Promise<string> {
   }
 
   // Create new
-  const { spreadsheetId, sheetId } = await createSpreadsheet("Soko", sheetName);
+  const { spreadsheetId, sheetId } = await createSpreadsheet("Knots Sheets", sheetName);
   await browser.storage.local.set({ spreadsheetId });
 
   // Write header row

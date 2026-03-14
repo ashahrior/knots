@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Soko",
+  "name": "Knots",
   "version": "1.0.0",
   "description": "Save, categorize, and track web resources directly into a Google Spreadsheet.",
   "permissions": ["identity", "activeTab", "storage", "contextMenus", "tabs"],

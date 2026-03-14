@@ -60,7 +60,7 @@ describe("spreadsheet-manager", () => {
 
       const id = await initSpreadsheet();
       expect(id).toBe("found-id");
-      expect(sheetsApi.searchDriveFile).toHaveBeenCalledWith("Soko");
+      expect(sheetsApi.searchDriveFile).toHaveBeenCalledWith("Knots Sheets");
     });
 
     it("creates a new spreadsheet if none found", async () => {
@@ -72,7 +72,7 @@ describe("spreadsheet-manager", () => {
 
       const id = await initSpreadsheet();
       expect(id).toBe("new-id");
-      expect(sheetsApi.createSpreadsheet).toHaveBeenCalledWith("Soko", "Default");
+      expect(sheetsApi.createSpreadsheet).toHaveBeenCalledWith("Knots Sheets", "Default");
       expect(sheetsApi.updateRange).toHaveBeenCalledWith(
         "new-id",
         "'Default'!A1:F1",

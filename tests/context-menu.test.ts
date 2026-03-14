@@ -11,7 +11,7 @@ describe("context-menu", () => {
     registerContextMenu();
     expect(browser.contextMenus.create).toHaveBeenCalledWith({
       id: "soko-save-note",
-      title: "Soko: Save Note",
+      title: "Knots: Save Note",
       contexts: ["selection"],
     });
   });

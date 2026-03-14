@@ -6,7 +6,7 @@ const MENU_ID = "soko-save-note";
 export function registerContextMenu(): void {
   browser.contextMenus.create({
     id: MENU_ID,
-    title: "Soko: Save Note",
+    title: "Knots: Save Note",
     contexts: ["selection"],
   });
 }
