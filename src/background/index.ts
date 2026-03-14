@@ -5,7 +5,7 @@ import { initSpreadsheet, getSheetName, ensureSheet } from "./spreadsheet-manage
 import { loadCache, syncCache, hasUrl, addUrl, clearCache } from "./cache-manager";
 import { categorize } from "./categorizer";
 import { registerContextMenu, onContextMenuClick } from "./context-menu";
-import { appendRow } from "./sheets-api";
+import { appendRow, getSheetNames, setDataValidation } from "./sheets-api";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -66,6 +66,14 @@ async function handleSave(
 
   try {
     await appendRow(stored.spreadsheetId, sheetName, row);
+
+    // Re-apply status column validation to cover all rows (including any
+    // previously inserted without validation)
+    const sheets = await getSheetNames(stored.spreadsheetId);
+    const sheet = sheets.find((s) => s.title === sheetName);
+    if (sheet) {
+      await setDataValidation(stored.spreadsheetId, sheet.sheetId, 5, ["Todo", "In progress", "Done"]);
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     await sendToast(tab.id, `Save failed: ${msg}`);
@@ -205,6 +213,18 @@ browser.runtime.onMessage.addListener(
             await browser.storage.local.set({ sheetName: message.sheetName });
           }
           return { success: true };
+        })();
+
+      case "getSheets":
+        return (async () => {
+          const stored = (await browser.storage.local.get(
+            "spreadsheetId",
+          )) as StorageSchema;
+          if (!stored.spreadsheetId) return { sheets: [] };
+          const sheets = await import("./sheets-api").then((m) =>
+            m.getSheetNames(stored.spreadsheetId!),
+          );
+          return { sheets: sheets.map((s) => s.title) };
         })();
 
       default:

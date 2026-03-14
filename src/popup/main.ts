@@ -17,6 +17,7 @@ const btnBack = document.getElementById("btn-back")!;
 
 // ─── Settings elements ──────────────────────────────────────────────────────
 const sheetNameInput = document.getElementById("sheet-name") as HTMLInputElement;
+const sheetList = document.getElementById("sheet-list") as HTMLDataListElement;
 const btnSaveSheet = document.getElementById("btn-save-sheet")!;
 const sheetStatus = document.getElementById("sheet-status")!;
 const toggleSmart = document.getElementById("toggle-smart") as HTMLInputElement;
@@ -143,6 +144,21 @@ async function loadSettings() {
 
   sheetNameInput.value = data.sheetName ?? "Default";
   toggleSmart.checked = data.smartCategorization !== false;
+
+  // Populate sheet name dropdown with existing sheets
+  try {
+    const res = (await browser.runtime.sendMessage({ action: "getSheets" })) as {
+      sheets: string[];
+    };
+    sheetList.innerHTML = "";
+    for (const name of res.sheets) {
+      const option = document.createElement("option");
+      option.value = name;
+      sheetList.appendChild(option);
+    }
+  } catch {
+    // Not logged in or API error — leave dropdown empty
+  }
 }
 
 btnSaveSheet.addEventListener("click", async () => {

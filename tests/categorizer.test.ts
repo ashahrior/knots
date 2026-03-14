@@ -36,6 +36,35 @@ describe("categorize", () => {
     expect(categorize("https://news.ycombinator.com/item?id=123")).toBe("Forum");
   });
 
+  it("returns 'Social' for social media platforms", () => {
+    expect(categorize("https://twitter.com/user")).toBe("Social");
+    expect(categorize("https://x.com/user")).toBe("Social");
+    expect(categorize("https://www.linkedin.com/in/user")).toBe("Social");
+    expect(categorize("https://bsky.app/profile/user")).toBe("Social");
+  });
+
+  it("returns 'News' for news sites", () => {
+    expect(categorize("https://techcrunch.com/2024/01/01/post")).toBe("News");
+    expect(categorize("https://www.bbc.com/news/article")).toBe("News");
+    expect(categorize("https://arstechnica.com/article")).toBe("News");
+  });
+
+  it("returns 'Learning' for education platforms", () => {
+    expect(categorize("https://www.coursera.org/learn/ml")).toBe("Learning");
+    expect(categorize("https://leetcode.com/problems/two-sum")).toBe("Learning");
+    expect(categorize("https://freecodecamp.org/news/post")).toBe("Learning");
+  });
+
+  it("returns 'AI' for AI platforms", () => {
+    expect(categorize("https://chat.openai.com/chat")).toBe("AI");
+    expect(categorize("https://claude.ai/chat")).toBe("AI");
+  });
+
+  it("returns 'Research' for academic sites", () => {
+    expect(categorize("https://arxiv.org/abs/2301.00001")).toBe("Research");
+    expect(categorize("https://scholar.google.com/scholar?q=test")).toBe("Research");
+  });
+
   it("returns 'Webpage' for unknown domains", () => {
     expect(categorize("https://example.com")).toBe("Webpage");
     expect(categorize("https://my-blog.com/post")).toBe("Webpage");
@@ -52,7 +81,7 @@ describe("categorize", () => {
   });
 
   it("handles subdomains correctly", () => {
-    expect(categorize("https://music.youtube.com/watch?v=abc")).toBe("Video");
+    expect(categorize("https://music.youtube.com/watch?v=abc")).toBe("Music");
     expect(categorize("https://user.substack.com/p/post")).toBe("Article");
   });
 });

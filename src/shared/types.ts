@@ -34,6 +34,10 @@ export interface EnsureSheetMessage {
   sheetName: string;
 }
 
+export interface GetSheetsMessage {
+  action: "getSheets";
+}
+
 export type ExtensionMessage =
   | SaveMessage
   | ShowToastMessage
@@ -41,7 +45,8 @@ export type ExtensionMessage =
   | LogoutMessage
   | GetStatusMessage
   | ClearCacheMessage
-  | EnsureSheetMessage;
+  | EnsureSheetMessage
+  | GetSheetsMessage;
 
 /** Shape of per-sheet URL cache stored in chrome.storage.local */
 export interface StorageSchema {

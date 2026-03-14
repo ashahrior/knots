@@ -5,34 +5,7 @@
  * Falls back to "Webpage" when no match is found or when the feature is disabled.
  */
 
-const DOMAIN_CATEGORY_MAP: Record<string, string> = {
-  "youtube.com": "Video",
-  "youtu.be": "Video",
-  "vimeo.com": "Video",
-  "twitch.tv": "Video",
-  "dailymotion.com": "Video",
-
-  "medium.com": "Article",
-  "substack.com": "Article",
-  "dev.to": "Article",
-  "hashnode.com": "Article",
-  "blogger.com": "Article",
-  "wordpress.com": "Article",
-
-  "github.com": "Code",
-  "gitlab.com": "Code",
-  "bitbucket.org": "Code",
-  "codepen.io": "Code",
-  "stackblitz.com": "Code",
-
-  "stackoverflow.com": "Q&A",
-  "superuser.com": "Q&A",
-  "serverfault.com": "Q&A",
-  "askubuntu.com": "Q&A",
-
-  "reddit.com": "Forum",
-  "news.ycombinator.com": "Forum",
-};
+import { DOMAIN_CATEGORY_MAP } from "./domain-categories";
 
 /**
  * Determine the content type of a URL.

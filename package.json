@@ -20,6 +20,7 @@
     "@tailwindcss/vite": "^4.2.1",
     "@types/webextension-polyfill": "^0.12.5",
     "chrome-types": "^0.1.423",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.9.3",
     "vite": "^8.0.0",
