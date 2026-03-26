@@ -5,7 +5,7 @@ import { initSpreadsheet, getSheetName, ensureSheet } from "./spreadsheet-manage
 import { loadCache, syncCache, hasUrl, addUrl, clearCache } from "./cache-manager";
 import { categorize } from "./categorizer";
 import { registerContextMenu, onContextMenuClick } from "./context-menu";
-import { appendRow, getSheetNames, setDataValidation, findRowByUrl, updateRange, escapeSheetName } from "./sheets-api";
+import { appendRow, findRowByUrl, updateRange, escapeSheetName } from "./sheets-api";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -22,13 +22,6 @@ async function sendToast(tabId: number, message: string): Promise<void> {
   }
 }
 
-async function isSmartCategorizationEnabled(): Promise<boolean> {
-  const data = (await browser.storage.local.get(
-    "smartCategorization",
-  )) as StorageSchema;
-  return data.smartCategorization !== false; // default true
-}
-
 // ─── Save Pipeline ──────────────────────────────────────────────────────────
 
 async function handleSave(
@@ -37,9 +30,11 @@ async function handleSave(
 ): Promise<void> {
   if (!tab.url || !tab.id) return;
 
-  const stored = (await browser.storage.local.get(
+  const stored = (await browser.storage.local.get([
     "spreadsheetId",
-  )) as StorageSchema;
+    "smartCategorization",
+    "sheetName",
+  ])) as StorageSchema;
   if (!stored.spreadsheetId) {
     await sendToast(tab.id, "Please sign in first.");
     return;
@@ -51,9 +46,9 @@ async function handleSave(
     return;
   }
 
-  const smartEnabled = await isSmartCategorizationEnabled();
+  const smartEnabled = stored.smartCategorization !== false;
   const type = categorize(tab.url, smartEnabled);
-  const sheetName = await getSheetName();
+  const sheetName = stored.sheetName ?? "Default";
 
   const row = [
     formatDate(new Date()),
@@ -66,14 +61,6 @@ async function handleSave(
 
   try {
     await appendRow(stored.spreadsheetId, sheetName, row);
-
-    // Re-apply status column validation to cover all rows (including any
-    // previously inserted without validation)
-    const sheets = await getSheetNames(stored.spreadsheetId);
-    const sheet = sheets.find((s) => s.title === sheetName);
-    if (sheet) {
-      await setDataValidation(stored.spreadsheetId, sheet.sheetId, 5, ["Todo", "In progress", "Done"]);
-    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     await sendToast(tab.id, `Save failed: ${msg}`);
@@ -168,20 +155,12 @@ browser.runtime.onMessage.addListener(
             console.log("[knots] login: starting...");
             const { email } = await login();
             console.log("[knots] login: success, email=", email);
-            await initSpreadsheet();
+            const { sheetNames } = await initSpreadsheet();
             console.log("[knots] login: spreadsheet initialized");
             await syncCache();
             console.log("[knots] login: cache synced");
-            // Cache sheet names on first login
-            const stored = (await browser.storage.local.get("spreadsheetId")) as StorageSchema;
-            if (stored.spreadsheetId) {
-              const sheets = await import("./sheets-api").then((m) =>
-                m.getSheetNames(stored.spreadsheetId!),
-              );
-              await browser.storage.local.set({
-                cachedSheetNames: sheets.map((s) => s.title),
-              });
-            }
+            // Cache sheet names from initSpreadsheet (no extra API call)
+            await browser.storage.local.set({ cachedSheetNames: sheetNames });
             return { success: true, email };
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);

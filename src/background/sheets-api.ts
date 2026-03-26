@@ -169,48 +169,7 @@ export async function formatHeaderRow(
   sheetId: number,
 ): Promise<void> {
   const body = {
-    requests: [
-      // Bold white text on dark blue background
-      {
-        repeatCell: {
-          range: {
-            sheetId,
-            startRowIndex: 0,
-            endRowIndex: 1,
-          },
-          cell: {
-            userEnteredFormat: {
-              backgroundColor: {
-                red: 0.102,
-                green: 0.137,
-                blue: 0.494,
-              },
-              textFormat: {
-                bold: true,
-                foregroundColor: {
-                  red: 1,
-                  green: 1,
-                  blue: 1,
-                },
-              },
-            },
-          },
-          fields: "userEnteredFormat(backgroundColor,textFormat)",
-        },
-      },
-      // Freeze header row
-      {
-        updateSheetProperties: {
-          properties: {
-            sheetId,
-            gridProperties: {
-              frozenRowCount: 1,
-            },
-          },
-          fields: "gridProperties.frozenRowCount",
-        },
-      },
-    ],
+    requests: buildHeaderFormatRequests(sheetId),
   };
   const res = await authenticatedFetch(`${SHEETS_BASE}/${ssId}:batchUpdate`, {
     method: "POST",
@@ -218,6 +177,132 @@ export async function formatHeaderRow(
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`Format header failed: ${res.status}`);
+}
+
+/** Build batchUpdate requests for header formatting (reusable). */
+function buildHeaderFormatRequests(sheetId: number) {
+  return [
+    {
+      repeatCell: {
+        range: { sheetId, startRowIndex: 0, endRowIndex: 1 },
+        cell: {
+          userEnteredFormat: {
+            backgroundColor: { red: 0.102, green: 0.137, blue: 0.494 },
+            textFormat: {
+              bold: true,
+              foregroundColor: { red: 1, green: 1, blue: 1 },
+            },
+          },
+        },
+        fields: "userEnteredFormat(backgroundColor,textFormat)",
+      },
+    },
+    {
+      updateSheetProperties: {
+        properties: {
+          sheetId,
+          gridProperties: { frozenRowCount: 1 },
+        },
+        fields: "gridProperties.frozenRowCount",
+      },
+    },
+  ];
+}
+
+/** Build batchUpdate request for data validation dropdown (reusable). */
+function buildDataValidationRequests(
+  sheetId: number,
+  columnIndex: number,
+  options: string[],
+) {
+  return [
+    {
+      setDataValidation: {
+        range: {
+          sheetId,
+          startRowIndex: 1,
+          startColumnIndex: columnIndex,
+          endColumnIndex: columnIndex + 1,
+        },
+        rule: {
+          condition: {
+            type: "ONE_OF_LIST" as const,
+            values: options.map((v) => ({ userEnteredValue: v })),
+          },
+          showCustomUi: true,
+          strict: true,
+        },
+      },
+    },
+  ];
+}
+
+/** Build batchUpdate requests for conditional formatting (reusable). */
+function buildConditionalFormatRequests(
+  sheetId: number,
+  statusColumnIndex: number,
+  statusOptions: string[],
+) {
+  const colorMap: Record<string, { red: number; green: number; blue: number }> = {
+    Todo:          { red: 0.85, green: 0.85, blue: 0.85 },
+    "In progress": { red: 0.96, green: 0.80, blue: 0.80 },
+    Done:          { red: 0.85, green: 0.94, blue: 0.85 },
+  };
+  const statusColLetter = String.fromCharCode(65 + statusColumnIndex);
+  return statusOptions
+    .map((status, index) => {
+      const bg = colorMap[status];
+      if (!bg) return null;
+      return {
+        addConditionalFormatRule: {
+          rule: {
+            ranges: [
+              {
+                sheetId,
+                startRowIndex: 1,
+                startColumnIndex: 0,
+                endColumnIndex: statusColumnIndex + 1,
+              },
+            ],
+            booleanRule: {
+              condition: {
+                type: "CUSTOM_FORMULA" as const,
+                values: [
+                  { userEnteredValue: `=$${statusColLetter}2="${status}"` },
+                ],
+              },
+              format: { backgroundColor: bg },
+            },
+          },
+          index,
+        },
+      };
+    })
+    .filter(Boolean);
+}
+
+/**
+ * Set up all formatting for a new sheet in a single batchUpdate call:
+ * header formatting + data validation + conditional formatting.
+ * This replaces 3 separate API calls with 1.
+ */
+export async function setupNewSheetFormatting(
+  ssId: string,
+  sheetId: number,
+  statusColumnIndex: number,
+  statusOptions: string[],
+): Promise<void> {
+  const requests = [
+    ...buildHeaderFormatRequests(sheetId),
+    ...buildDataValidationRequests(sheetId, statusColumnIndex, statusOptions),
+    ...buildConditionalFormatRequests(sheetId, statusColumnIndex, statusOptions),
+  ];
+  const res = await authenticatedFetch(`${SHEETS_BASE}/${ssId}:batchUpdate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ requests }),
+  });
+  if (!res.ok) throw new Error(`Setup sheet formatting failed: ${res.status}`);
 }
 
 /** Set data validation (dropdown) on a column. */

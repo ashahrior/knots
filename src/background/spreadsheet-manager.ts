@@ -6,9 +6,7 @@ import {
   getSheetNames,
   addSheet,
   updateRange,
-  setDataValidation,
-  setConditionalFormatting,
-  formatHeaderRow,
+  setupNewSheetFormatting,
   escapeSheetName,
 } from "./sheets-api";
 
@@ -28,17 +26,23 @@ export async function getSheetName(): Promise<string> {
  *  2. Create if not found
  *  3. Store spreadsheetId in local storage
  *  4. Ensure the target sheet exists with header + validation
+ * Returns { spreadsheetId, sheetNames } so callers can cache sheet names without
+ * an extra API call.
  */
-export async function initSpreadsheet(): Promise<string> {
+export async function initSpreadsheet(): Promise<{ spreadsheetId: string; sheetNames: string[] }> {
   // Check if we already have a stored ID
   const stored = (await browser.storage.local.get(
     "spreadsheetId",
   )) as StorageSchema;
   if (stored.spreadsheetId) {
-    // Verify the sheet exists within it
-    const sheetName = await getSheetName();
-    await ensureSheet(stored.spreadsheetId, sheetName);
-    return stored.spreadsheetId;
+    try {
+      const sheetName = await getSheetName();
+      const sheetNames = await ensureSheet(stored.spreadsheetId, sheetName);
+      return { spreadsheetId: stored.spreadsheetId, sheetNames };
+    } catch {
+      // Spreadsheet was deleted or is inaccessible — clear stale ID and continue
+      await browser.storage.local.remove("spreadsheetId");
+    }
   }
 
   const sheetName = await getSheetName();
@@ -46,9 +50,14 @@ export async function initSpreadsheet(): Promise<string> {
   // Search for existing
   const existing = await searchDriveFile("Knots Sheets");
   if (existing) {
-    await browser.storage.local.set({ spreadsheetId: existing.id });
-    await ensureSheet(existing.id, sheetName);
-    return existing.id;
+    try {
+      await browser.storage.local.set({ spreadsheetId: existing.id });
+      const sheetNames = await ensureSheet(existing.id, sheetName);
+      return { spreadsheetId: existing.id, sheetNames };
+    } catch {
+      // Drive file exists but is inaccessible — clear and fall through to create
+      await browser.storage.local.remove("spreadsheetId");
+    }
   }
 
   // Create new
@@ -58,37 +67,33 @@ export async function initSpreadsheet(): Promise<string> {
   // Write header row
   await updateRange(spreadsheetId, `'${escapeSheetName(sheetName)}'!A1:F1`, [HEADER_ROW]);
 
-  // Format header: bold white text on dark blue, frozen
-  await formatHeaderRow(spreadsheetId, sheetId);
+  // Set up all formatting in a single batchUpdate call
+  await setupNewSheetFormatting(spreadsheetId, sheetId, 5, STATUS_OPTIONS);
 
-  // Set status column validation (column index 5 = F)
-  await setDataValidation(spreadsheetId, sheetId, 5, STATUS_OPTIONS);
-
-  // Conditional formatting: colour rows by status value
-  await setConditionalFormatting(spreadsheetId, sheetId, 5, STATUS_OPTIONS);
-
-  return spreadsheetId;
+  return { spreadsheetId, sheetNames: [sheetName] };
 }
 
 /**
  * Ensure a named sheet exists in the spreadsheet.
  * Creates it + writes header + adds status validation if missing.
  */
+/**
+ * Ensure a named sheet exists in the spreadsheet.
+ * Creates it + sets up formatting if missing.
+ * Returns the list of sheet names (for caching, avoiding a second API call).
+ */
 export async function ensureSheet(
   ssId: string,
   name: string,
-): Promise<void> {
+): Promise<string[]> {
   const sheets = await getSheetNames(ssId);
+  const sheetNames = sheets.map((s) => s.title);
   const found = sheets.find((s) => s.title === name);
-  if (found) {
-    // Sheet exists — ensure conditional formatting is applied (idempotent)
-    await setConditionalFormatting(ssId, found.sheetId, 5, STATUS_OPTIONS);
-    return;
-  }
+  if (found) return sheetNames; // already exists — formatting was applied at creation time
 
   const sheetId = await addSheet(ssId, name);
   await updateRange(ssId, `'${escapeSheetName(name)}'!A1:F1`, [HEADER_ROW]);
-  await formatHeaderRow(ssId, sheetId);
-  await setDataValidation(ssId, sheetId, 5, STATUS_OPTIONS);
-  await setConditionalFormatting(ssId, sheetId, 5, STATUS_OPTIONS);
+  // Single batchUpdate for all formatting (header + validation + conditional)
+  await setupNewSheetFormatting(ssId, sheetId, 5, STATUS_OPTIONS);
+  return [...sheetNames, name];
 }

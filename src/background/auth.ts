@@ -1,7 +1,6 @@
 import browser from "webextension-polyfill";
 import type { StorageSchema } from "../shared/types";
 
-const GOOGLE_TOKEN_REVOKE_URL = "https://accounts.google.com/o/oauth2/revoke";
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 // tokeninfo doesn't require extra scopes — works with any valid token
 const GOOGLE_TOKENINFO_URL = "https://www.googleapis.com/oauth2/v3/tokeninfo";
@@ -185,25 +184,22 @@ export async function login(): Promise<{ email: string; token: string }> {
   return { email, token };
 }
 
-/** Revoke token & clear all auth/session storage. */
+/** Clear auth session. Does NOT revoke the OAuth token so that `drive.file`
+ *  per-file authorisation is preserved across logouts — preventing duplicate
+ *  spreadsheet creation on re-login. The token expires naturally (~1 h). */
 export async function logout(): Promise<void> {
   const data = (await browser.storage.local.get("accessToken")) as StorageSchema;
-  if (data.accessToken) {
-    // Best-effort revoke
-    await fetch(`${GOOGLE_TOKEN_REVOKE_URL}?token=${data.accessToken}`, {
-      method: "POST",
-    }).catch(() => {});
-
-    // Chrome-specific: also remove cached token
-    if (isChrome()) {
-      chrome.identity.removeCachedAuthToken({ token: data.accessToken }, () => {});
-    }
+  if (data.accessToken && isChrome()) {
+    // Remove Chrome's cached token so the next getAuthToken() issues a fresh one
+    chrome.identity.removeCachedAuthToken({ token: data.accessToken }, () => {});
   }
+
+  // Clear auth state but keep data-related keys (spreadsheetId, cachedSheetNames)
+  // so re-login reconnects to the same spreadsheet instead of creating a new one.
   await browser.storage.local.remove([
     "accessToken",
     "tokenExpiresAt",
     "userEmail",
-    "spreadsheetId",
     "urlCache",
     "sheetName",
     "smartCategorization",
